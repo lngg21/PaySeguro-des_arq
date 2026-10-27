@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PaySeguro Carteira Digital — Relatório de Arquitetura & Teorema CAP</title>
+  <meta name="description"
+    content="Dossiê executivo e técnico de arquitetura de dados distribuídos: Decisões CP vs AP (MongoDB vs Cassandra) diante de partições de rede na PaySeguro.">
+
+  <!-- Fontes Google -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="src/css/styles.css">
+</head>
+
+<body class="dark-theme">
+  <!-- Barra de Navegação Superior / Header Corporativo -->
+  <header class="navbar" id="top-nav">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="brand-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="5" width="20" height="14" rx="3"></rect>
+            <line x1="2" y1="10" x2="22" y2="10"></line>
+            <circle cx="7" cy="15" r="1.5" fill="currentColor"></circle>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">PaySeguro</span>
+          <span class="brand-badge">Grupo 3 • Arquitetura</span>
+        </div>
+      </div>
+
+      <nav class="nav-links">
+        <a href="#incidente">O Incidente</a>
+        <a href="#teorema-cap">Teorema CAP</a>
+        <a href="#decisao-saldos">Saldos (CP)</a>
+        <a href="#decisao-feed">Feed (AP)</a>
+        <a href="#matriz-comparativa">Matriz CAP</a>
+        <a href="#simulador" class="nav-cta">
+          <span class="pulse-dot"></span> Simulador de Falha
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. Hero Section -->
+    <section class="hero-section" id="hero">
+      <div class="hero-glow hero-glow-1"></div>
+      <div class="hero-glow hero-glow-2"></div>
+
+      <div class="container hero-content">
+        <div class="badge-cluster">
+          <span class="tech-badge primary"><span class="indicator"></span> Caso Real de Engenharia Distribuída</span>
+          <span class="tech-badge neutral">Bancos NoSQL: MongoDB vs. Cassandra</span>
+          <span class="tech-badge alert">Partição de Rede (P) Inevitável</span>
+        </div>
+
+        <h1 class="hero-title">
+          PaySeguro Carteira Digital
+          <span class="gradient-text">Dossiê de Arquitetura & Teorema CAP</span>
+        </h1>
+
+        <p class="hero-subtitle">
+          Estratégia de Engenharia para Crise de Rompimento de Fibra Óptica Inter-Datacenters:
+          isolamento de trade-offs entre <strong>Consistência Estrita (CP)</strong> para saldos bancários e
+          <strong>Alta Disponibilidade Contínua (AP)</strong> para feed de notificações.
+        </p>
+
+        <!-- Painel Executivo de Indicadores -->
+        <div class="executive-kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-icon icon-danger">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                </path>
+                <line x1="12" y1="9" x2="12" y2="13"></line>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </div>
+            <div class="kpi-data">
+              <span class="kpi-label">Incidente Crítico</span>
+              <span class="kpi-value text-red">Fibra Óptica Rompida</span>
+              <span class="kpi-meta">Partição SP-01 ⚡ RJ-01</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon icon-mongo">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path
+                  d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+              </svg>
+            </div>
+            <div class="kpi-data">
+              <span class="kpi-label">Saldos & Pix (CP)</span>
+              <span class="kpi-value text-green">MongoDB Linearizável</span>
+              <span class="kpi-meta">Zero Risco de Saldo Fantasma</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon icon-cassandra">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M8 12h8"></path>
+                <path d="M12 8v8"></path>
+              </svg>
+            </div>
+            <div class="kpi-data">
+              <span class="kpi-label">Feed & Push (AP)</span>
+              <span class="kpi-value text-cyan">Cassandra Masterless</span>
+              <span class="kpi-meta">100% Uptime Sem Single Point</span>
+            </div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-icon icon-team">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+            </div>
+            <div class="kpi-data">
+              <span class="kpi-label">Responsável Técnico</span>
+              <span class="kpi-value text-purple">Engenharia Grupo 3</span>
+              <span class="kpi-meta">Arquitetura de Dados NoSQL</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. O Diagnóstico da Crise (O Incidente) -->
+    <section class="section" id="incidente">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag alert">Post-Mortem Técnico</span>
+          <h2 class="section-title">O Diagnóstico da Crise: Quando o Link Físico Rompeu</h2>
+          <p class="section-desc">
+            Análise forense do incidente em que um corte de infraestrutura expôs o perigo de adotar uma solução de banco
+            única e ingênua para requisitos com naturezas opostas de negócio.
+          </p>
+        </div>
+
+        <div class="incident-layout">
+          <div class="incident-card main-event">
+            <div class="incident-header">
+              <div class="alert-icon-ring">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path>
+                </svg>
+              </div>
+              <div>
+                <span class="incident-time">09:42 BRT • Falha Crítica de Conectividade</span>
+                <h3>Rompimento de Fibra Óptica: Partição de Rede Real ('P')</h3>
+              </div>
+            </div>
+
+            <p class="incident-body">
+              Durante obras civis em rodovia interestadual, o duto primário e o enlace de redundância de fibra óptica
+              conectando o
+              <strong>Data Center Sul (SP-01 - Primário)</strong> e o <strong>Data Center Norte (RJ-01 -
+                Secundário)</strong> foram
+              rompidos simultaneamente. Em segundos, os dois polos de processamento da PaySeguro ficaram
+              completamente isolados um do outro, impedindo qualquer sincronismo síncrono ou replicação tradicional.
+            </p>
+
+            <div class="impact-metrics-row">
+              <div class="impact-metric">
+                <span class="metric-title">Causa Raiz</span>
+                <span class="metric-desc">Partição de Rede (P no Teorema CAP). Os nós estavam vivos, mas
+                  incomunicáveis.</span>
+              </div>
+              <div class="impact-metric">
+                <span class="metric-title">Efeito no Legado</span>
+                <span class="metric-desc">Arquitetura ingênua com consistência eventual causou "Saldos Fantasma" e
+                  saques concorrentes.</span>
+              </div>
+              <div class="impact-metric">
+                <span class="metric-title">Prejuízo Potencial</span>
+                <span class="metric-desc">Risco regulatório no Banco Central (BACEN) por quebra de liquidez e
+                  conciliação bancária.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Timeline do Incidente -->
+          <div class="incident-timeline-wrapper">
+            <h4 class="timeline-title">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              Sequência de Eventos do Incidente
+            </h4>
+
+            <div class="timeline">
+              <div class="timeline-step">
+                <div class="step-marker danger"></div>
+                <div class="step-content">
+                  <span class="step-timestamp">09:42:12</span>
+                  <span class="step-headline">Link Rompido (Partição Declarada)</span>
+                  <p>Perda total de comunicação inter-regiões. Latência atinge infinito (timeout TCP).</p>
+                </div>
+              </div>
+
+              <div class="timeline-step">
+                <div class="step-marker warning"></div>
+                <div class="step-content">
+                  <span class="step-timestamp">09:43:05</span>
+                  <span class="step-headline">Tentativa de Reconciliação Cega</span>
+                  <p>Clientes no Rio de Janeiro e em São Paulo gastavam o mesmo saldo simultaneamente sem quórum global.
+                  </p>
+                </div>
+              </div>
+
+              <div class="timeline-step">
+                <div class="step-marker info"></div>
+                <div class="step-content">
+                  <span class="step-timestamp">09:50:30</span>
+                  <span class="step-headline">Engenharia do Grupo 3 Assume o Comando</span>
+                  <p>Determinação imediata: Segregação dos domínios em bancos NoSQL especializados guiados pelo Teorema
+                    CAP.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. O Teorema CAP Explicado à Diretoria -->
+    <section class="section alt-bg" id="teorema-cap">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag primary">Fundamento Teórico</span>
+          <h2 class="section-title">O Teorema CAP Explicado à Diretoria Executiva</h2>
+          <p class="section-desc">
+            Em sistemas de computação distribuída com múltiplos data centers, falhas de comunicação não são hipóteses:
+            são certezas estatísticas. Por que a física nos força a escolher entre <strong>Consistência</strong> ou
+            <strong>Disponibilidade</strong>?
+          </p>
+        </div>
+
+        <div class="cap-explainer-grid">
+          <!-- Os 3 Pilares -->
+          <div class="cap-pillar-card" id="pillar-c">
+            <div class="pillar-letter">C</div>
+            <div class="pillar-body">
+              <h3>Consistência (Linearizabilidade)</h3>
+              <p>
+                Toda leitura subsequente a uma escrita bem-sucedida deve retornar obrigatoriamente o valor mais recente
+                ou falhar com erro.
+              </p>
+              <div class="pillar-rule">
+                <strong>Regra Financeira:</strong> Um cliente nunca pode ler um saldo de R$ 1.000 se acabou de
+                transferir R$ 900.
+              </div>
+            </div>
+          </div>
+
+          <div class="cap-pillar-card" id="pillar-a">
+            <div class="pillar-letter">A</div>
+            <div class="pillar-body">
+              <h3>Disponibilidade (Availability)</h3>
+              <p>
+                Todo nó não-falho responde a qualquer requisição recebida com sucesso (sem erro de indisponibilidade ou
+                timeout), sem garantia de ser a versão mais recente.
+              </p>
+              <div class="pillar-rule">
+                <strong>Regra de UX:</strong> O usuário abre o app e a interface nunca exibe uma tela travada com erro
+                503.
+              </div>
+            </div>
+          </div>
+
+          <div class="cap-pillar-card highlight-p" id="pillar-p">
+            <div class="pillar-letter">P</div>
+            <div class="pillar-body">
+              <h3>Tolerância a Partição (Partition Tolerance)</h3>
+              <p>
+                O sistema continua operando mesmo quando mensagens entre servidores são perdidas, atrasadas ou quando a
+                rede é partida em duas.
+              </p>
+              <div class="pillar-rule">
+                <strong>Fato Inevitável:</strong> Em redes reais com mais de um data center, <em>P não é
+                  negociável</em>. Cabos rompem.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- O Dilema Real Interativo -->
+        <div class="cap-interactive-box">
+          <div class="interactive-header">
+            <div>
+              <h3>Simulador de Decisão CAP para a Diretoria</h3>
+              <p>Como P é mandatório no mundo físico, selecione o comportamento desejado durante uma partição:</p>
+            </div>
+            <div class="cap-toggles" role="group" aria-label="Seletor CAP">
+              <button type="button" class="cap-btn active" data-mode="cp" id="btn-mode-cp">
+                Escolha CP (Consistência + P)
+              </button>
+              <button type="button" class="cap-btn" data-mode="ap" id="btn-mode-ap">
+                Escolha AP (Disponibilidade + P)
+              </button>
+              <button type="button" class="cap-btn" data-mode="ca" id="btn-mode-ca">
+                Ilusão "CA" (Sem Partição)
+              </button>
+            </div>
+          </div>
+
+          <div class="cap-canvas" id="cap-canvas-display">
+            <!-- Renderizado via JavaScript dinâmico -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Decisão 1: Saldos Bancários (CP - MongoDB) -->
+    <section class="section" id="decisao-saldos">
+      <div class="container">
+        <div class="decision-banner cp-banner">
+          <div class="decision-tag">Decisão Arquitetural 01 • Transacional / Saldos</div>
+          <div class="decision-header-flex">
+            <div>
+              <h2 class="decision-title">Saldos Bancários: Foco em CP com MongoDB</h2>
+              <p class="decision-subtitle">Prioridade absoluta: <strong>Integridade Numérica Estrita</strong>. Dinheiro
+                não aceita aproximações.</p>
+            </div>
+            <div class="tech-pill-badge mongo">
+              <span>MongoDB Enterprise Replica Set</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="decision-grid">
+          <div class="decision-explanation">
+            <div class="card-inner">
+              <h3 class="card-title">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Justificativa Técnica de Negócio
+              </h3>
+              <p>
+                Em transações financeiras (Pix, saques, pagamentos de boletos), a consistência eventual é catastrófica.
+                Se dois nós aceitarem débito simultâneo sem comunicação, o saldo é duplicado (<em>Double Spending</em>).
+              </p>
+              <p>
+                Ao escolher o modelo <strong>CP (Consistency + Partition Tolerance)</strong> com MongoDB, assumimos que,
+                se houver partição de rede,
+                qualquer nó que não pertença à maioria de quórum <strong>rejeitará imediatamente a operação de
+                  escrita</strong> em vez de registrar um saldo errôneo.
+              </p>
+
+              <div class="bullet-highlights">
+                <div class="highlight-item">
+                  <div class="h-icon check">✓</div>
+                  <div>
+                    <strong>Quórum e Eleição de Primary:</strong>
+                    MongoDB utiliza consenso distribuído (estilo Raft). Se o Primary ficar na minoria isolada, ele se
+                    auto-rebaixa para Secondary e recusa escritas.
+                  </div>
+                </div>
+                <div class="highlight-item">
+                  <div class="h-icon check">✓</div>
+                  <div>
+                    <strong>Write Concern <code>w: "majority"</code>:</strong>
+                    O débito de saldo só é confirmado ao cliente após gravação persistente na maioria estrita dos nós
+                    ativos.
+                  </div>
+                </div>
+                <div class="highlight-item">
+                  <div class="h-icon check">✓</div>
+                  <div>
+                    <strong>Read Concern <code>"linearizable"</code>:</strong>
+                    Garante que nenhuma leitura retorne dados obsoletos ou provenientes de um Primary órfão
+                    particionado.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Code Card Interativo MongoDB -->
+          <div class="decision-code-panel">
+            <div class="code-panel-header">
+              <div class="dots">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+              </div>
+              <span class="code-title">mongodb-wallet-service.js (Configuração CP Estrita)</span>
+            </div>
+            <pre class="code-block"><code><span class="token-comment">// PaySeguro: Transação de Saldo Atômico com Quórum Estrito</span>
+<span class="token-keyword">const</span> { MongoClient } = <span class="token-function">require</span>(<span class="token-string">'mongodb'</span>);
+
+<span class="token-keyword">const</span> client = <span class="token-keyword">new</span> <span class="token-function">MongoClient</span>(process.env.MONGO_URI, {
+  <span class="token-comment">// 1. Write Concern Obrigatório: escrita confirmada na MAIORIA</span>
+  writeConcern: { <span class="token-prop">w</span>: <span class="token-string">'majority'</span>, <span class="token-prop">wtimeoutMS</span>: 5000 },
+  <span class="token-comment">// 2. Read Concern Obrigatório: impede leitura de Primary isolado</span>
+  readConcern: { <span class="token-prop">level</span>: <span class="token-string">'linearizable'</span> },
+  <span class="token-comment">// 3. Apenas nós que participam do quórum respondem</span>
+  readPreference: <span class="token-string">'primary'</span>
+});
+
+<span class="token-keyword">async function</span> <span class="token-function">efetuarDebitoSeguro</span>(userId, valorPix) {
+  <span class="token-keyword">const</span> session = client.<span class="token-function">startSession</span>();
+  <span class="token-keyword">try</span> {
+    <span class="token-keyword">return await</span> session.<span class="token-function">withTransaction</span>(<span class="token-keyword">async</span> () => {
+      <span class="token-keyword">const</span> wallets = client.<span class="token-function">db</span>(<span class="token-string">'payseguro'</span>).<span class="token-function">collection</span>(<span class="token-string">'wallets'</span>);
+      
+      <span class="token-comment">// Atualização condicionada: garante saldo suficiente</span>
+      <span class="token-keyword">const</span> res = <span class="token-keyword">await</span> wallets.<span class="token-function">updateOne</span>(
+        { <span class="token-prop">_id</span>: userId, <span class="token-prop">saldo</span>: { <span class="token-prop">$gte</span>: valorPix } },
+        { <span class="token-prop">$inc</span>: { <span class="token-prop">saldo</span>: -valorPix }, <span class="token-prop">$set</span>: { <span class="token-prop">lastUpdate</span>: <span class="token-keyword">new</span> <span class="token-function">Date</span>() } },
+        { session }
+      );
+
+      <span class="token-keyword">if</span> (res.matchedCount === 0) {
+        <span class="token-keyword">throw new</span> <span class="token-function">Error</span>(<span class="token-string">'Saldo insuficiente ou bloqueio concorrente'</span>);
+      }
+      <span class="token-keyword">return</span> { <span class="token-prop">status</span>: <span class="token-string">'DEBITADO_COM_QUORUM'</span> };
+    });
+  } <span class="token-keyword">catch</span> (err) {
+    <span class="token-comment">// Em caso de partição, o nó sem quórum falha rápido (fail-fast)</span>
+    <span class="token-keyword">return</span> { <span class="token-prop">status</span>: <span class="token-string">'REJEITADO_PARTICAO_SEGURA'</span>, <span class="token-prop">motivo</span>: err.message };
+  } <span class="token-keyword">finally</span> {
+    <span class="token-keyword">await</span> session.<span class="token-function">endSession</span>();
+  }
+}</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Decisão 2: Feed de Notificações do App (AP - Cassandra) -->
+    <section class="section alt-bg" id="decisao-feed">
+      <div class="container">
+        <div class="decision-banner ap-banner">
+          <div class="decision-tag">Decisão Arquitetural 02 • Alta Concorrência / Notificações</div>
+          <div class="decision-header-flex">
+            <div>
+              <h2 class="decision-title">Feed de Notificações: Foco em AP com Apache Cassandra</h2>
+              <p class="decision-subtitle">Prioridade absoluta: <strong>Disponibilidade Máxima Ininterrupta</strong>. O
+                app nunca pode ficar fora.</p>
+            </div>
+            <div class="tech-pill-badge cassandra">
+              <span>Apache Cassandra Ring Multi-DC</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="decision-grid">
+          <div class="decision-explanation">
+            <div class="card-inner">
+              <h3 class="card-title">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                Justificativa Técnica de Negócio
+              </h3>
+              <p>
+                O feed de notificações (alerta de transação recebida, promoções, avisos de cashback) precisa responder
+                instantaneamente a milhões de usuários.
+                Se uma notificação for entregue com 3 segundos de atraso ou fora de ordem estrita, o negócio não sofre
+                prejuízo financeiro.
+              </p>
+              <p>
+                Ao escolher o modelo <strong>AP (Availability + Partition Tolerance)</strong> com Cassandra, garantimos
+                que <strong>qualquer nó do cluster aceita escritas e leituras</strong>,
+                mesmo que o cabo entre data centers esteja partido. A consistência é <em>eventual</em>.
+              </p>
+
+              <div class="bullet-highlights">
+                <div class="highlight-item">
+                  <div class="h-icon check">✓</div>
+                  <div>
+                    <strong>Arquitetura Masterless (Peer-to-Peer):</strong>
+                    Não existe nó primário nem eleição. Todos os nós coordenam e gravam independentemente, eliminando
+                    Single Point of Failure (SPOF).
+                  </div>
+                </div>
+                <div class="highlight-item">
+                  <div class="h-icon check">✓</div>
+                  <div>
+                    <strong>Tunable Consistency (Consistência Ajustável):</strong>
+                    Utilizamos nível <code>LOCAL_QUORUM</code> ou <code>ONE</code>. Uma escrita no Data Center RJ-01 é
+                    concluída localmente sem esperar a fibra de SP voltar.
+                  </div>
+                </div>
+                <div class="highlight-item">
+                  <div class="h-icon check">✓</div>
+                  <div>
+                    <strong>Hinted Handoff & Read Repair:</strong>
+                    Assim que a fibra é restaurada, os nós trocam mutações pendentes via gossip protocol automaticamente
+                    em background.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Code Card Interativo Cassandra -->
+          <div class="decision-code-panel">
+            <div class="code-panel-header">
+              <div class="dots">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+              </div>
+              <span class="code-title">feed_notifications.cql (Cassandra Multi-DC Schema)</span>
+            </div>
+            <pre
+              class="code-block"><code><span class="token-comment">-- PaySeguro: Keyspace com Replicação Geográfica Multi-Datacenter</span>
+<span class="token-keyword">CREATE KEYSPACE</span> payseguro_feed
+<span class="token-keyword">WITH</span> replication = {
+  <span class="token-string">'class'</span>: <span class="token-string">'NetworkTopologyStrategy'</span>,
+  <span class="token-string">'DC_SP01'</span>: 3,  <span class="token-comment">-- 3 réplicas em São Paulo</span>
+  <span class="token-string">'DC_RJ01'</span>: 3   <span class="token-comment">-- 3 réplicas no Rio de Janeiro</span>
+};
+
+<span class="token-comment">-- Tabela particionada por usuário e ordenada temporalmente</span>
+<span class="token-keyword">CREATE TABLE</span> payseguro_feed.notifications (
+  user_id <span class="token-keyword">uuid</span>,
+  notification_id <span class="token-keyword">timeuuid</span>,
+  category <span class="token-keyword">text</span>,
+  title <span class="token-keyword">text</span>,
+  body <span class="token-keyword">text</span>,
+  is_read <span class="token-keyword">boolean</span>,
+  <span class="token-keyword">PRIMARY KEY</span> ((user_id), notification_id)
+) <span class="token-keyword">WITH CLUSTERING ORDER BY</span> (notification_id <span class="token-keyword">DESC</span>);
+
+<span class="token-comment">-- Consulta com consistência LOCAL_QUORUM:</span>
+<span class="token-comment">-- Opera com disponibilidade 100% mesmo se a fibra inter-DC romper!</span>
+<span class="token-keyword">CONSISTENCY</span> LOCAL_QUORUM;
+<span class="token-keyword">INSERT INTO</span> payseguro_feed.notifications (user_id, notification_id, title, body)
+<span class="token-keyword">VALUES</span> (f47ac10b-58cc-4372-a567-0e02b2c3d479, now(), <span class="token-string">'Pix Recebido!'</span>, <span class="token-string">'R$ 150,00'</span>);</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. Matriz de Decisão Comparativa -->
+    <section class="section" id="matriz-comparativa">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag neutral">Síntese Estratégica</span>
+          <h2 class="section-title">Comparativo Rápido / Matriz de Decisão</h2>
+          <p class="section-desc">
+            Alinhamento entre requisitos de negócio da PaySeguro, posicionamento no Teorema CAP e comportamento
+            operacional durante incidentes de rede.
+          </p>
+        </div>
+
+        <div class="table-container">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th>Dimensão / Critério</th>
+                <th>Saldos Bancários (Carteira Digital)</th>
+                <th>Feed de Notificações do App</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="table-feature">
+                  <strong>Requisito Crítico de Negócio</strong>
+                </td>
+                <td>
+                  <span class="badge-table cp">Integridade Matemática Absoluta</span><br>
+                  Zero tolerância a saldos duplicados ou inconsistentes.
+                </td>
+                <td>
+                  <span class="badge-table ap">Disponibilidade Máxima (UX Fluida)</span><br>
+                  O app nunca pode travar ou recusar exibição de feeds.
+                </td>
+              </tr>
+              <tr>
+                <td class="table-feature">
+                  <strong>Classificação Teorema CAP</strong>
+                </td>
+                <td>
+                  <span class="cap-tag-pill cp">CP (Consistência + Tolerância a Partição)</span>
+                </td>
+                <td>
+                  <span class="cap-tag-pill ap">AP (Disponibilidade + Tolerância a Partição)</span>
+                </td>
+              </tr>
+              <tr>
+                <td class="table-feature">
+                  <strong>Banco NoSQL Selecionado</strong>
+                </td>
+                <td>
+                  <strong>MongoDB</strong> (Replica Sets com Raft Consensus)
+                </td>
+                <td>
+                  <strong>Apache Cassandra</strong> (Masterless Ring Architecture)
+                </td>
+              </tr>
+              <tr>
+                <td class="table-feature">
+                  <strong>Comportamento em Partição de Rede</strong>
+                </td>
+                <td>
+                  <div class="status-indicator-box error">
+                    <span class="mini-bullet"></span>
+                    <strong>Nó sem quórum bloqueia escritas temporariamente.</strong>
+                    Preserva saldo real; evita <em>split-brain</em>.
+                  </div>
+                </td>
+                <td>
+                  <div class="status-indicator-box success">
+                    <span class="mini-bullet"></span>
+                    <strong>Continua gravando e servindo normalmente.</strong>
+                    Sincronização assíncrona assim que o link restabelece.
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="table-feature">
+                  <strong>Nível de Consistência Configurado</strong>
+                </td>
+                <td>
+                  <code>WriteConcern: majority</code><br>
+                  <code>ReadConcern: linearizable</code>
+                </td>
+                <td>
+                  <code>Consistency Level: LOCAL_QUORUM</code><br>
+                  ou <code>ONE</code> com Hinted Handoff
+                </td>
+              </tr>
+              <tr>
+                <td class="table-feature">
+                  <strong>Impacto de uma Decisão Invertida</strong>
+                </td>
+                <td>
+                  <span class="text-danger">Catástrofe Financeira:</span> Se usasse AP, usuários sacariam saldo fantasma
+                  antes da sincronização.
+                </td>
+                <td>
+                  <span class="text-warning">Desgaste de UX:</span> Se usasse CP, qualquer instabilidade de fibra
+                  impediria o usuário de abrir notificações.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. Simulador Interativo em Tempo Real -->
+    <section class="section" id="simulador">
+      <div class="container">
+        <div class="section-header">
+          <span class="section-tag alert">Laboratório Interativo</span>
+          <h2 class="section-title">Simulador em Tempo Real: Partição de Rede Inter-Datacenters</h2>
+          <p class="section-desc">
+            Ative a falha no enlace de fibra óptica e observe instantaneamente a divergência de comportamento:
+            o MongoDB protege a integridade travando nós minoritários, enquanto o Cassandra garante a continuidade do
+            feed sem interrupção.
+          </p>
+        </div>
+
+        <div class="simulator-wrapper">
+          <!-- Painel de Controle da Falha -->
+          <div class="sim-controls-bar">
+            <div class="sim-toggle-block">
+              <label class="switch" for="partition-switch">
+                <input type="checkbox" id="partition-switch">
+                <span class="slider round"></span>
+              </label>
+              <div class="toggle-text">
+                <span class="toggle-title" id="toggle-state-label">Estado da Rede: Link Operacional (Normal)</span>
+                <span class="toggle-subtitle" id="toggle-state-desc">Datacenters SP-01 e RJ-01 comunicando-se com
+                  latência &lt; 8ms.</span>
+              </div>
+            </div>
+
+            <div class="sim-action-buttons">
+              <button type="button" class="btn btn-action" id="btn-test-pix">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                Disparar Pix R$ 150 (MongoDB)
+              </button>
+              <button type="button" class="btn btn-action secondary" id="btn-test-feed">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                </svg>
+                Enviar Notificação Push (Cassandra)
+              </button>
+              <button type="button" class="btn btn-ghost" id="btn-reset-sim">Resetar</button>
+            </div>
+          </div>
+
+          <!-- Topologia Gráfica dos Data Centers -->
+          <div class="topology-container">
+            <!-- Data Center SP-01 -->
+            <div class="dc-card" id="dc-sp">
+              <div class="dc-header">
+                <div class="dc-title-wrap">
+                  <span class="dc-badge">Data Center 01 (São Paulo)</span>
+                  <h4>SP-01 (Quórum Maioritário)</h4>
+                </div>
+                <span class="dc-status-pill online" id="dc-sp-status">ONLINE (3 Nós)</span>
+              </div>
+
+              <div class="dc-nodes-grid">
+                <div class="node-box" id="node-mongo-sp">
+                  <span class="node-type">MongoDB (CP)</span>
+                  <span class="node-role role-primary" id="mongo-sp-role">PRIMARY [Eleito]</span>
+                  <span class="node-desc">Aceita gravações com WriteConcern=majority</span>
+                </div>
+                <div class="node-box" id="node-cass-sp">
+                  <span class="node-type">Cassandra (AP)</span>
+                  <span class="node-role role-peer">PEER COORDENADOR</span>
+                  <span class="node-desc">Aceita writes locais e roteia na partição</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Link de Fibra Óptica Inter-DC -->
+            <div class="network-link-bridge" id="fiber-link">
+              <div class="cable-line" id="cable-line"></div>
+              <div class="cable-badge" id="cable-badge">
+                <span class="cable-pulse"></span>
+                <span id="cable-status-text">Fibra Óptica 100Gbps Ativa</span>
+              </div>
+            </div>
+
+            <!-- Data Center RJ-01 -->
+            <div class="dc-card" id="dc-rj">
+              <div class="dc-header">
+                <div class="dc-title-wrap">
+                  <span class="dc-badge">Data Center 02 (Rio de Janeiro)</span>
+                  <h4>RJ-01 (Segmento Isolado / Minoria)</h4>
+                </div>
+                <span class="dc-status-pill online" id="dc-rj-status">ONLINE (2 Nós)</span>
+              </div>
+
+              <div class="dc-nodes-grid">
+                <div class="node-box" id="node-mongo-rj">
+                  <span class="node-type">MongoDB (CP)</span>
+                  <span class="node-role role-secondary" id="mongo-rj-role">SECONDARY [Réplica]</span>
+                  <span class="node-desc" id="mongo-rj-desc">Sincronizado via Oplog</span>
+                </div>
+                <div class="node-box" id="node-cass-rj">
+                  <span class="node-type">Cassandra (AP)</span>
+                  <span class="node-role role-peer">PEER COORDENADOR</span>
+                  <span class="node-desc">Aceita writes locais (Local Quorum)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Cards de Diagnóstico Simultâneo de Resposta -->
+          <div class="sim-results-grid">
+            <!-- Resposta MongoDB -->
+            <div class="sim-card-result cp-result" id="result-mongo">
+              <div class="result-header">
+                <div class="result-icon-mongo">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path
+                      d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" />
+                  </svg>
+                </div>
+                <div>
+                  <span class="result-cat">Sistema de Saldos Bancários (CP / MongoDB)</span>
+                  <h4 id="mongo-card-headline">Operação Normal: Consistência Forte Garantida</h4>
+                </div>
+              </div>
+              <div class="result-body" id="mongo-card-body">
+                Gravações transacionais ocorrendo com replicação síncrona na maioria dos nós. Nenhum risco de
+                duplicidade de saldo detectado.
+              </div>
+              <div class="result-footer">
+                <span class="metric-tag" id="mongo-metric-tag">Status: 100% Consistente</span>
+                <span class="metric-latency">Latência Média: 12ms</span>
+              </div>
+            </div>
+
+            <!-- Resposta Cassandra -->
+            <div class="sim-card-result ap-result" id="result-cassandra">
+              <div class="result-header">
+                <div class="result-icon-cassandra">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M8 12h8"></path>
+                    <path d="M12 8v8"></path>
+                  </svg>
+                </div>
+                <div>
+                  <span class="result-cat">Feed de Notificações do App (AP / Cassandra)</span>
+                  <h4 id="cass-card-headline">Operação Normal: Alta Disponibilidade Ativa</h4>
+                </div>
+              </div>
+              <div class="result-body" id="cass-card-body">
+                Nós atendem notificações push sem bloqueios. Mutações são gravadas localmente e replicadas em
+                background.
+              </div>
+              <div class="result-footer">
+                <span class="metric-tag" id="cass-metric-tag">Status: 100% Disponível</span>
+                <span class="metric-latency">Latência Média: 4ms</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Console de Telemetria e Logs em Tempo Real -->
+          <div class="telemetry-console">
+            <div class="console-header">
+              <div class="console-title">
+                <span class="terminal-dot"></span>
+                <span>Console de Telemetria Distribuída (Live Stream)</span>
+              </div>
+              <button type="button" class="btn-clear" id="btn-clear-logs">Limpar Logs</button>
+            </div>
+            <div class="console-body" id="console-logs">
+              <div class="log-line info">
+                <span class="log-time">[09:40:00]</span>
+                <span class="log-origin">[SYS_MONITOR]</span>
+                Cluster PaySeguro inicializado. Topologia Multi-DC sincronizada.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Conclusão Executiva e Assinatura do Grupo -->
+    <section class="section executive-summary-section">
+      <div class="container">
+        <div class="exec-summary-card">
+          <div class="exec-badge">Recomendação Final da Engenharia</div>
+          <h3 class="exec-title">O Teorema CAP não é uma limitação, é uma bússola de projeto</h3>
+          <p class="exec-text">
+            Tentar forçar um único banco de dados genérico para resolver <strong>saldos financeiros</strong> e
+            <strong>feeds de notificações</strong> é um erro fatal que culmina ou na falência por saldos fantasmas ou
+            no congelamento completo da experiência do cliente.
+            A solução elegante implementada pelo <strong>Grupo 3</strong> utiliza a especialização poliglota:
+            <strong>MongoDB no perfil CP</strong> assegura fidelidade matemática irrevogável, enquanto
+            <strong>Apache Cassandra no perfil AP</strong> garante que a PaySeguro permaneça viva e ágil em qualquer
+            tela.
+          </p>
+          <div class="exec-footer">
+            <div class="exec-authors">
+              <strong>Equipe de Engenharia e Arquitetura de Software — Grupo 3</strong>
+              <span>Desafio de Arquitetura de Dados NoSQL • PaySeguro Carteira Digital</span>
+            </div>
+            <a href="#hero" class="btn btn-ghost">Voltar ao Topo ↑</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Rodapé Corporativo -->
+  <footer class="footer">
+    <div class="container footer-content">
+      <div class="footer-left">
+        <span class="footer-logo">PaySeguro</span>
+        <span class="footer-copy">© 2026 PaySeguro Carteira Digital S.A. — Entrega de Arquitetura Grupo 3</span>
+      </div>
+      <div class="footer-right">
+        <span>Pronto para contêiner Docker / Nginx</span>
+        <span class="separator">•</span>
+        <span>HTML5 / CSS Moderno / Vanilla JS</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="src/js/app.js"></script>
+</body>
+
+</html>
